@@ -4,6 +4,9 @@ from prometheus_client.core import Gauge
 from datetime import date, timedelta
 from datetime import datetime
 
+from src.__main__ import EXPORTER_API_REQUESTS_FAILED_TOTAL, EXPORTER_API_REQUESTS_TOTAL
+from src.config import settings
+
 
 class UsersWithoutTurnedOnNotificationsCollector:
     """
@@ -11,11 +14,19 @@ class UsersWithoutTurnedOnNotificationsCollector:
     """
 
     def _count_users_without_turned_on(self) -> int:
-        all_usernames = set([user.get('name') for user in requests.get("http://localhost:8080/api/v0/users").json()])
+        users_response = requests.get(settings.ONCALL_EXPORTER_API_URL + "/api/v0/users")
+        EXPORTER_API_REQUESTS_TOTAL.inc()
+        if users_response.status_code != 200:
+            EXPORTER_API_REQUESTS_FAILED_TOTAL.inc()
+        all_usernames = set([user.get('name') for user in users_response.json()])
 
         for user_name in all_usernames:
-            notifications_and_reminders = requests.get(
-                f"http://localhost:8080/api/v0/users/{user_name}/notifications").json()
+            EXPORTER_API_REQUESTS_TOTAL.inc()
+            notifications_and_reminders_request = requests.get(
+                settings.ONCALL_EXPORTER_API_URL + f"/api/v0/users/{user_name}/notifications")
+            if notifications_and_reminders_request.status_code != 200:
+                EXPORTER_API_REQUESTS_FAILED_TOTAL.inc()
+            notifications_and_reminders = notifications_and_reminders_request.json()
 
             flag = False
 
@@ -23,7 +34,10 @@ class UsersWithoutTurnedOnNotificationsCollector:
                 flag |= 'primary' in notification.get('roles')
 
             if flag:
-                all_usernames.remove(user_name)
+                try:
+                    all_usernames.remove(user_name)
+                except KeyError:
+                    pass
 
         return len(all_usernames)
 
@@ -37,20 +51,26 @@ class UsersWithoutTurnedOnNotificationsCollector:
 
 
 class DaysWithoutUserOnCall:
+    """
+        Рассчитать кол-во дней, Когда ни у одной команды нет челвека на смене с ролью "primary" в течении сл 30 дней.
+    """
 
     def _count_days_without_users_oncall(self):
-        # TODO: РАССЧИТАТЬ ВРЕМЯ!!!
-        url_to_events = "http://127.0.0.1:8080/api/v0/events"
+        url_to_events = settings.ONCALL_EXPORTER_API_URL + "/api/v0/events"
         today = datetime.combine(date.today(), datetime.min.time())
         past_30_days = today + timedelta(days=30)
         all_dates_timestamps = set()
         for i in range(31):
             all_dates_timestamps.add((today + timedelta(days=i)).timestamp())
-        url_all_teams = "http://127.0.0.1:8080/api/v0/teams"
+        url_all_teams = settings.ONCALL_EXPORTER_API_URL + "/api/v0/teams"
 
-        team_names = requests.get(url_all_teams).json()
+        EXPORTER_API_REQUESTS_TOTAL.inc()
+        team_names_response = requests.get(url_all_teams)
+        if team_names_response.status_code != 200:
+            EXPORTER_API_REQUESTS_FAILED_TOTAL.inc()
 
-        for team_name in team_names:
+        for team_name in team_names_response.json():
+            EXPORTER_API_REQUESTS_TOTAL.inc()
             response = requests.get(
                 url_to_events,
                 params={
@@ -58,9 +78,10 @@ class DaysWithoutUserOnCall:
                     "start__lt": str(today.timestamp()),
                     "team__eq": team_name
                 }
-            ).json()
-
-            for record in response:
+            )
+            if response.status_code != 200:
+                EXPORTER_API_REQUESTS_FAILED_TOTAL.inc()
+            for record in response.json():
                 if record.get('role') == "primary":
                     record_start_datetime = datetime.fromtimestamp(record.get('start'))
                     record_end_datetime = datetime.fromtimestamp(record.get('end'))
