@@ -1,6 +1,8 @@
 import logging
 import os
 
+from prometheus_client.core import Counter
+
 
 class Config:
     ONCALL_EXPORTER_API_URL = os.environ.get("ONCALL_EXPORTER_API_URL", "http://localhost:8080")
@@ -10,3 +12,6 @@ class Config:
 
 
 settings = Config()
+EXPORTER_API_REQUESTS_TOTAL = Counter("exporter_api_requests_total", "Total count of requests to oncall API")
+EXPORTER_API_REQUESTS_FAILED_TOTAL = Counter(
+    "exporter_api_requests_failed_total", "Total count of faled requests to oncall API")

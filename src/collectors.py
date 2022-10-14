@@ -4,7 +4,7 @@ from prometheus_client.core import Gauge
 from datetime import date, timedelta
 from datetime import datetime
 
-from src.__main__ import EXPORTER_API_REQUESTS_FAILED_TOTAL, EXPORTER_API_REQUESTS_TOTAL
+from src.config import EXPORTER_API_REQUESTS_FAILED_TOTAL, EXPORTER_API_REQUESTS_TOTAL
 from src.config import settings
 
 
