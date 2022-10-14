@@ -1,6 +1,6 @@
 import requests
 
-from prometheus_client.core import Gauge
+from prometheus_client.core import Gauge, GaugeMetricFamily
 from datetime import date, timedelta
 from datetime import datetime
 
@@ -18,8 +18,8 @@ class UsersWithoutTurnedOnNotificationsCollector:
         EXPORTER_API_REQUESTS_TOTAL.inc()
         if users_response.status_code != 200:
             EXPORTER_API_REQUESTS_FAILED_TOTAL.inc()
-        all_usernames = set([user.get('name') for user in users_response.json()])
-
+        all_usernames = [user.get('name') for user in users_response.json()]
+        all_usernames_set = set(all_usernames)
         for user_name in all_usernames:
             EXPORTER_API_REQUESTS_TOTAL.inc()
             notifications_and_reminders_request = requests.get(
@@ -35,18 +35,20 @@ class UsersWithoutTurnedOnNotificationsCollector:
 
             if flag:
                 try:
-                    all_usernames.remove(user_name)
+                    all_usernames_set.remove(user_name)
                 except KeyError:
                     pass
 
-        return len(all_usernames)
+        return len(all_usernames_set)
 
     def collect(self):
-        exporter_users_without_turned_on_gauge = Gauge(
+        exporter_users_without_turned_on_gauge = GaugeMetricFamily(
             "exporter_users_without_turned_on_notification",
-            "Check if we have users without turned on"
+            "Check if we have users without turned on",
+            labels=['exporter_users_without_turned_on']
         )
-        exporter_users_without_turned_on_gauge.set(self._count_users_without_turned_on())
+        exporter_users_without_turned_on_gauge.add_metric(['exporter_users_without_turned_on'],
+                                                          self._count_users_without_turned_on())
         yield exporter_users_without_turned_on_gauge
 
 
@@ -74,8 +76,8 @@ class DaysWithoutUserOnCall:
             response = requests.get(
                 url_to_events,
                 params={
-                    "end__ge": str(past_30_days.timestamp()),
-                    "start__lt": str(today.timestamp()),
+                    "start__lt": int(past_30_days.timestamp()),
+                    "end__ge": int(today.timestamp()),
                     "team__eq": team_name
                 }
             )
@@ -96,9 +98,11 @@ class DaysWithoutUserOnCall:
             return len(all_dates_timestamps)
 
     def collect(self):
-        exporter_days_without_users_on_call_gauge = Gauge(
-            "exporter_users_without_turned_on_notification",
-            "Check if we have users without turned on"
+        exporter_days_without_users_on_call_gauge = GaugeMetricFamily(
+            "exporter_days_without_users_on_call",
+            "Check if there are days in next 30 days without primary user on duty",
+            labels=['exporter_days_without_users_on_call']
         )
-        exporter_days_without_users_on_call_gauge.set(self._count_days_without_users_oncall())
+        exporter_days_without_users_on_call_gauge.add_metric(['exporter_days_without_users_on_call'],
+                                                             self._count_days_without_users_oncall())
         yield exporter_days_without_users_on_call_gauge
