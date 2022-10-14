@@ -4,7 +4,7 @@ from prometheus_client.core import Gauge, GaugeMetricFamily
 from datetime import date, timedelta
 from datetime import datetime
 
-from src.config import EXPORTER_API_REQUESTS_FAILED_TOTAL, EXPORTER_API_REQUESTS_TOTAL
+from src.config import EXPORTER_API_REQUESTS_FAILED_TOTAL, EXPORTER_API_REQUESTS_TOTAL, EXPORTER_TIME_FOR_REQUEST
 from src.config import settings
 
 
@@ -14,7 +14,11 @@ class UsersWithoutTurnedOnNotificationsCollector:
     """
 
     def _count_users_without_turned_on(self) -> int:
+        time_beg = datetime.now()
         users_response = requests.get(settings.ONCALL_EXPORTER_API_URL + "/api/v0/users")
+        time_end = datetime.now()
+        seconds = (time_end - time_beg).seconds
+        EXPORTER_TIME_FOR_REQUEST.set(seconds)
         EXPORTER_API_REQUESTS_TOTAL.inc()
         if users_response.status_code != 200:
             EXPORTER_API_REQUESTS_FAILED_TOTAL.inc()
@@ -67,7 +71,11 @@ class DaysWithoutUserOnCall:
         url_all_teams = settings.ONCALL_EXPORTER_API_URL + "/api/v0/teams"
 
         EXPORTER_API_REQUESTS_TOTAL.inc()
+        time_beg = datetime.now()
         team_names_response = requests.get(url_all_teams)
+        time_end = datetime.now()
+        seconds = (time_end - time_beg).seconds
+        EXPORTER_TIME_FOR_REQUEST.set(seconds)
         if team_names_response.status_code != 200:
             EXPORTER_API_REQUESTS_FAILED_TOTAL.inc()
 

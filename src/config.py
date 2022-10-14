@@ -1,7 +1,7 @@
 import logging
 import os
 
-from prometheus_client.core import Counter
+from prometheus_client.core import Counter, Gauge
 
 
 class Config:
@@ -15,3 +15,7 @@ settings = Config()
 EXPORTER_API_REQUESTS_TOTAL = Counter("exporter_api_requests_total", "Total count of requests to oncall API")
 EXPORTER_API_REQUESTS_FAILED_TOTAL = Counter(
     "exporter_api_requests_failed_total", "Total count of faled requests to oncall API")
+
+EXPORTER_TIME_FOR_REQUEST = Gauge(
+    "exporter_time_for_request_in_seconds", "Time per One request in secons"
+)
