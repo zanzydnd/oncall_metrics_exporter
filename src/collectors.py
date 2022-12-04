@@ -22,6 +22,7 @@ class UsersWithoutTurnedOnNotificationsCollector:
         EXPORTER_API_REQUESTS_TOTAL.inc()
         if users_response.status_code != 200:
             EXPORTER_API_REQUESTS_FAILED_TOTAL.inc()
+            return 0
         all_usernames = [user.get('name') for user in users_response.json()]
         all_usernames_set = set(all_usernames)
         for user_name in all_usernames:
